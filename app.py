@@ -1,4 +1,4 @@
-# app.py
+
 import streamlit as st
 import pandas as pd
 import yfinance as yf
@@ -9,19 +9,12 @@ import warnings
 import os
 
 warnings.filterwarnings("ignore")
-
-# -----------------------------
-# PAGE CONFIG
-# -----------------------------
 st.set_page_config(
     page_title="BTC/USD Dashboard",
     page_icon=":money_with_wings:",
     layout="wide"
 )
 
-# -----------------------------
-# BACKGROUND IMAGE
-# -----------------------------
 current_dir = os.path.dirname(os.path.abspath(__file__))
 image_path = os.path.join(current_dir, "image.jpg").replace("\\", "/")
 
@@ -40,35 +33,22 @@ if os.path.exists(image_path):
     """
     st.markdown(page_bg_img, unsafe_allow_html=True)
 
-# -----------------------------
-# TITLE
-# -----------------------------
 st.title("📈 Bitcoin (BTC) USD Dashboard")
 st.markdown("Interactive cryptocurrency analysis with Plotly and ARIMA forecasting")
 
-# -----------------------------
-# LOAD LIVE DATA
-# -----------------------------
-@st.cache_data(ttl=3600)  # cache for 1 hour
+
+@st.cache_data(ttl=3600)  
 def load_live_data(ticker="BTC-USD", period="2y"):
     df = yf.download(ticker, period=period)
     df.reset_index(inplace=True)
-
-    # Flatten MultiIndex columns if needed
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = [col[0] for col in df.columns]
-
-    # Keep only standard columns
     df = df[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']]
     df.sort_values("Date", inplace=True)
     df.reset_index(drop=True, inplace=True)
     return df
 
 df = load_live_data()
-
-# -----------------------------
-# SIDEBAR OPTIONS
-# -----------------------------
 st.sidebar.header("Options")
 
 chart_type = st.sidebar.selectbox(
@@ -79,25 +59,17 @@ chart_type = st.sidebar.selectbox(
 start_date = st.sidebar.date_input("Start Date", df['Date'].min())
 end_date = st.sidebar.date_input("End Date", df['Date'].max())
 
-# Ensure start_date <= end_date
 if start_date > end_date:
     st.sidebar.error("Start Date must be before End Date!")
 
-# Filter data based on selected dates
+
 mask = (df['Date'] >= pd.to_datetime(start_date)) & (df['Date'] <= pd.to_datetime(end_date))
 data_filtered = df.loc[mask].reset_index(drop=True)
 
-# -----------------------------
-# REFRESH BUTTON
-# -----------------------------
 if st.sidebar.button("Refresh Data"):
     df = load_live_data()
     data_filtered = df.loc[(df['Date'] >= pd.to_datetime(start_date)) & (df['Date'] <= pd.to_datetime(end_date))].reset_index(drop=True)
     st.success("Data updated!")
-
-# -----------------------------
-# LINE CHART
-# -----------------------------
 if chart_type == "Line Chart":
     st.subheader("BTC/USD Closing Price Over Time")
     fig = px.line(
@@ -109,10 +81,6 @@ if chart_type == "Line Chart":
         template="plotly_dark"
     )
     st.plotly_chart(fig, use_container_width=True)
-
-# -----------------------------
-# CANDLESTICK CHART
-# -----------------------------
 elif chart_type == "Candlestick Chart":
     st.subheader("Candlestick Chart")
     
@@ -127,8 +95,6 @@ elif chart_type == "Candlestick Chart":
             decreasing_line_color='red'
         )]
     )
-
-    # Optional: Add volume as bar chart
     fig.add_trace(go.Bar(
         x=data_filtered['Date'],
         y=data_filtered['Volume'],
@@ -153,9 +119,6 @@ elif chart_type == "Candlestick Chart":
     )
     st.plotly_chart(fig, use_container_width=True)
 
-# -----------------------------
-# ARIMA FORECAST
-# -----------------------------
 elif chart_type == "ARIMA Forecast":
     st.subheader("ARIMA Forecast")
     st.info("Forecasting next 30 days of BTC/USD closing price")
@@ -165,17 +128,13 @@ elif chart_type == "ARIMA Forecast":
     if len(close_prices) < 30:
         st.warning("Not enough data for ARIMA forecast. Select a larger date range.")
     else:
-        # Fit ARIMA model
+        
         model = ARIMA(close_prices, order=(5,1,0))
         model_fit = model.fit()
-
-        # Forecast 30 days
         forecast = model_fit.forecast(steps=30)
         forecast_dates = pd.date_range(data_filtered['Date'].max() + pd.Timedelta(days=1), periods=30)
 
         forecast_df = pd.DataFrame({'Date': forecast_dates, 'Forecast': forecast})
-
-        # Plot actual + forecast
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=data_filtered['Date'], y=data_filtered['Close'], mode='lines', name='Actual'))
         fig.add_trace(go.Scatter(x=forecast_df['Date'], y=forecast_df['Forecast'], mode='lines', name='Forecast',
@@ -189,9 +148,6 @@ elif chart_type == "ARIMA Forecast":
         )
         st.plotly_chart(fig, use_container_width=True)
 
-# -----------------------------
-# SHOW RAW DATA
-# -----------------------------
 if st.sidebar.checkbox("Show raw data"):
     st.subheader("Raw Data")
     st.dataframe(data_filtered)
